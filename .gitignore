@@ -20,4 +20,3 @@ target/
 *.ipr
 
 .git
-.mvn
