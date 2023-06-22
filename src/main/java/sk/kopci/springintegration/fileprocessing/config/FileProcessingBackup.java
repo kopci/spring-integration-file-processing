@@ -1,22 +1,17 @@
 package sk.kopci.springintegration.fileprocessing.config;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.integration.annotation.Transformer;
-import org.springframework.integration.channel.PublishSubscribeChannel;
-import org.springframework.integration.config.EnableIntegration;
 import org.springframework.integration.dsl.IntegrationFlow;
-import org.springframework.integration.file.dsl.Files;
 import org.springframework.integration.handler.LoggingHandler;
-import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.Payload;
-import utils.Messages;
+import sk.kopci.springintegration.fileprocessing.utils.FileTypes;
+import sk.kopci.springintegration.fileprocessing.utils.Messages;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.util.Arrays;
 import java.util.List;
 
@@ -28,8 +23,7 @@ public class FileProcessingBackup {
     public static final String FILE_EXTENSION_ERROR = "_error";
 
     private List<String> needsXmlBackup = Arrays.asList(
-            "firstType",
-            "secondType"
+            FileTypes.METADATA_PDF.getValue()
     );
 
     @Bean

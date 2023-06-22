@@ -1,4 +1,4 @@
-package utils;
+package sk.kopci.springintegration.fileprocessing.utils;
 
 public class Messages {
 

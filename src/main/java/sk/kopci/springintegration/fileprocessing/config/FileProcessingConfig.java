@@ -11,8 +11,9 @@ import org.springframework.integration.dsl.Pollers;
 import org.springframework.integration.file.FileReadingMessageSource;
 import org.springframework.integration.file.filters.LastModifiedFileListFilter;
 import org.springframework.integration.handler.LoggingHandler;
-import utils.Constants;
-import utils.Messages;
+import sk.kopci.springintegration.fileprocessing.utils.Constants;
+import sk.kopci.springintegration.fileprocessing.utils.FileTypes;
+import sk.kopci.springintegration.fileprocessing.utils.Messages;
 
 import java.io.File;
 import java.io.IOException;
@@ -48,11 +49,37 @@ public class FileProcessingConfig {
                         return source.getName().endsWith(".pdf");
                     }
                 })
-                .enrichHeaders(eh -> eh.header(Constants.HEADER_FILE_TYPE, "firstType"))
+                .enrichHeaders(eh -> eh.header(Constants.HEADER_FILE_TYPE, FileTypes.PDF))
                 .enrichHeaders(eh -> eh.header(Constants.HEADER_TARGET_PATH, targetPath))
                 .enrichHeaders(eh -> eh.header(Constants.HEADER_SOURCE_PATH, sourcePath))
                 .enrichHeaders(eh -> eh.headerExpression(Constants.HEADER_ORIGINAL_FN, "payload.getName"))
                 .channel("processPdf.input")
+                .get();
+    }
+
+    @Bean
+    public IntegrationFlow configureMetadataPdfProcessing(
+            @Value("${app-config.metadata-files.source}") String sourcePath,
+            @Value("${app-config.metadata-files.target}") String targetPath
+    ) throws ConfigurationException {
+        validatePaths(sourcePath, targetPath);
+        createTargetDirectory(targetPath);
+
+        return IntegrationFlow.from(
+                        getDataSource(sourcePath),
+                        conf -> conf.poller(Pollers.fixedDelay(pollerDelay))
+                )
+                .filter(new GenericSelector<File>() { // accepts only PDF
+                    @Override
+                    public boolean accept(File source) {
+                        return source.getName().endsWith(".pdf");
+                    }
+                })
+                .enrichHeaders(eh -> eh.header(Constants.HEADER_FILE_TYPE, FileTypes.METADATA_PDF))
+                .enrichHeaders(eh -> eh.header(Constants.HEADER_TARGET_PATH, targetPath))
+                .enrichHeaders(eh -> eh.header(Constants.HEADER_SOURCE_PATH, sourcePath))
+                .enrichHeaders(eh -> eh.headerExpression(Constants.HEADER_ORIGINAL_FN, "payload.getName"))
+                .channel("processMetadataPdf.input")
                 .get();
     }
 
@@ -84,10 +111,10 @@ public class FileProcessingConfig {
 
     private void validatePaths(String sourcePath, String targetPath) throws ConfigurationException {
         if (sourcePath == null || sourcePath.length() == 0) {
-            throw new ConfigurationException("Messages.ERROR_INVALID_SOURCE_PATH");
+            throw new ConfigurationException(Messages.EX_INVALID_SOURCE_PATH);
         }
         if (targetPath == null || targetPath.length() == 0) {
-            throw new ConfigurationException("Messages.ERROR_INVALID_TARGET_PATH");
+            throw new ConfigurationException(Messages.EX_INVALID_TARGET_PATH);
         }
     }
 

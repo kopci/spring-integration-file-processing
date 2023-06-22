@@ -1,4 +1,4 @@
-package sk.kopci.springintegration.fileprocessing.business.firstType;
+package sk.kopci.springintegration.fileprocessing.business.pdf;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
@@ -7,7 +7,7 @@ import org.springframework.integration.dsl.IntegrationFlow;
 import org.springframework.integration.handler.LoggingHandler;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Component;
-import utils.Messages;
+import sk.kopci.springintegration.fileprocessing.utils.Messages;
 
 import java.io.File;
 
