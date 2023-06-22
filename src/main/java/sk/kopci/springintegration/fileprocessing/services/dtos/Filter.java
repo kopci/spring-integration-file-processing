@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
-public class FilterDto {
+public class Filter {
 
     private FilterValues values;
     private String sort;

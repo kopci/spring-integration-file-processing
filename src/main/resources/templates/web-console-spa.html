@@ -10,18 +10,16 @@
     <link rel="stylesheet" th:href="@{/css/components.css}"/>
 </head>
 
-<body>
+<body style="padding:10px">
     <div class="container-fluid">
         <div class="row">
             <div class="col">
-                <ui-component name="datagrid" path="items" config="margin:22;button:clicked">
+                <ui-component name="datagrid" path="common.files" config="margin:22;button:clicked">
                     <script type="text/plain">
                         [
-                            { name: 'name', text: 'Name', width: 200 },
-                            { name: 'price', text: 'Price', align: 1, alignfilter: 1 },
-                            { name: 'published', text: 'Public', align: 1, options: [{ name: 'yes', id: true }, { name: 'no', id: false }], type: 'boolean' },
-                            { name: 'description', text: 'Description', filter: 'Search in description' },
-                            { name: 'created', text: 'Created', align: 1, template: '{{ created | format(\'dd.MM.yyyy\') }}', align: 2, alignfilter: 2, alignheader: 2 },
+                            { name: 'string1', text: 'Name', width: 300 },
+                            { name: 'string2', text: 'Price', width: 300 },
+                            { name: 'date1', text: 'Date', align: 1, template: '{{ date1 | format(\'dd.MM.yyyy hh:mm:ss\') }}', align: 2, alignfilter: 2, alignheader: 2, width: 300 },
                             { type: 'controls', template: '<button name="show"><i class="ti ti-search"></i><span>Show</span></button><button name="edit"><i class="ti ti-pencil"></i></button><button name="remove"><i class="ti ti-trash red"></i></button>' }
                         ]
                     </script>
@@ -33,18 +31,26 @@
 
 <script>
 
-	var items = [];
-	for (var i = 1; i < 90; i++)
-		items.push({
-		name: 'Lorem ipsum dolor',
-		published: i % 5 !== 0,
-		description: 'Lorem ipsum dolor sit amet, consectetur adipisicing elit. Consectetur, mollitia!',
-		price: i + 100,
-		created: new Date().add('-5 days') });
+	var common = {};
+
+	// default empty filter
+	var filter = {
+	    values: {},
+	    sort: 'date1_desc',
+	    page: 1
+	};
 
 	function clicked(btnname, row, button, e) {
 		console.log(btnname, row);
 	}
+
+	AJAX('POST /api/files', filter, function(value, err, response) {
+        if (err) {
+            console.log('Api fetch failed', err);
+        }
+
+        SET('common.files', value);
+    });
 
 </script>
 
