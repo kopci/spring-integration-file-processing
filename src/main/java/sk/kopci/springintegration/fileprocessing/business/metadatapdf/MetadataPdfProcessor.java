@@ -3,7 +3,6 @@ package sk.kopci.springintegration.fileprocessing.business.metadatapdf;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.integration.annotation.ServiceActivator;
 import org.springframework.integration.annotation.Transformer;
 import org.springframework.integration.dsl.IntegrationFlow;
 import org.springframework.integration.handler.LoggingHandler;
@@ -19,7 +18,7 @@ import java.io.IOException;
 
 @Slf4j
 @Configuration
-public class MetadataPdf {
+public class MetadataPdfProcessor {
 
     @Bean
     public IntegrationFlow processMetadataPdf() {
