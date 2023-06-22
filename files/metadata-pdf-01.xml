@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8">
+<document>
+<property name="string1" type="string">TEST_001</property>
+<property name="string2" type="string">This is test</property>
+<property name="date1" type="date">31.01.2023 01:04:09.0</property>
+</document>
