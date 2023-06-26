@@ -132,7 +132,7 @@
 		        'confirm',
 		        'show2',
 		        'Do you want to remove <b>' + row.string1 + '</b> record?',
-		        ['"check-circle" Remove #2BA433', 'Cancel'],
+		        ['"check-circle" Remove #EC2C28', 'Cancel'],
 		        function() {
 		            // TODO call api
 		            console.log('Removed');
@@ -160,12 +160,6 @@
 
 	// Dark-mode toggle
 	WATCH('common.darkmode', function(path, value, type) {
-
-        // Arguments description:
-        // @path {String} Path which has been changed
-        // @value {Object} New value
-        // @type {Number} 0: init, 1: manually, 2: input, 3 default
-
         $('body').tclass('ui-dark');
     });
 
