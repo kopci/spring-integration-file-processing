@@ -1,12 +1,14 @@
 package sk.kopci.springintegration.fileprocessing.business.pdf;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.integration.annotation.ServiceActivator;
 import org.springframework.integration.dsl.IntegrationFlow;
 import org.springframework.integration.handler.LoggingHandler;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Component;
+import sk.kopci.springintegration.fileprocessing.services.ProcessedFileService;
 import sk.kopci.springintegration.fileprocessing.utils.Messages;
 
 import java.io.File;
@@ -14,6 +16,9 @@ import java.io.File;
 @Slf4j
 @Component
 public class PdfProcessor {
+
+    @Autowired
+    private ProcessedFileService service;
 
     @Bean
     public IntegrationFlow processPdf() {
@@ -51,7 +56,11 @@ public class PdfProcessor {
 
     @ServiceActivator
     public File doSomeProcessing(@Payload File file) {
-        log.info("Processing file: " + file.getName());
+        log.info("Processing PDF file: " + file.getName());
+        service.logProcessedFile(
+                file.getName(),
+                "Testing"
+        );
         return file;
     }
 

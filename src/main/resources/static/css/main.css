@@ -1,0 +1,9 @@
+body { margin: 20px 20px 0; }
+
+.filter-button { margin-bottom: 10px; outline: none; border: none; border-radius: 3px; background-color: #7296ce; min-width: 60px; line-height: 24px; font-size: 12px; float: right; color: white; }
+.filter-button:hover { opacity: .8; }
+.ui-dark .filter-button { background-color: #7296ce36; }
+
+.settings-button { margin-bottom: 10px; outline: none; border: 1px solid #D0D0D0; border-radius: 3px; background-color: white; min-width: 26px; line-height: 24px; font-size: 12px; float: left; color: gray; }
+.settings-button:hover { background-color: #D0D0D0; }
+.ui-dark .settings-button { background-color: #292929; border-color: #353535; }

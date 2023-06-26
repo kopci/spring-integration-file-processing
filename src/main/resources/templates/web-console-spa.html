@@ -8,30 +8,58 @@
     <script th:src="@{/js/components.js}"></script>
     <link rel="stylesheet" th:href="@{/spa.min@19.css}"/>
     <link rel="stylesheet" th:href="@{/css/components.css}"/>
+    <link rel="stylesheet" th:href="@{/css/main.css}"/>
 </head>
 
-<body style="padding:10px">
+<body>
     <div class="container-fluid">
+
+        <!-- components -->
+        <ui-component name="confirm"></ui-component>
+        <ui-component name="LAZY timepicker"></ui-component>
+        <ui-component name="LAZY datepicker"></ui-component>
+        <ui-component name="LAZY directory"></ui-component>
+        <ui-component name="filter"></ui-component>
+
         <div class="row">
             <div class="col">
-                <ui-component name="datagrid" path="common.files" config="margin:22;button:clicked">
+                <!--<ui-component name="switchbutton" path="common.darkmode" config="description:Toggle between light and dark theme;">Theme</ui-component>-->
+                <button class="settings-button" onclick="onSettingsClick()"><i class="ti ti-cog"></i></button>
+                <button class="filter-button" onclick="onFilterClick()">From-to filter</button>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col">
+                <ui-component name="datagrid" path="common.files" config="margin:22;button:onRowClick;exec:onFilterSort">
                     <script type="text/plain">
                         [
                             { name: 'string1', text: 'Name', width: 300 },
                             { name: 'string2', text: 'Price', width: 300 },
-                            { name: 'date1', text: 'Date', align: 1, template: '{{ date1 | format(\'dd.MM.yyyy hh:mm:ss\') }}', align: 2, alignfilter: 2, alignheader: 2, width: 300 },
+                            { name: 'date1', text: 'Date', align: 1, template: '{{ date1 | format(\'dd.MM.yyyy hh:mm:ss\') }}', align: 2, alignfilter: 2, alignheader: 2, width: 300, filter: false },
                             { type: 'controls', template: '<button name="show"><i class="ti ti-search"></i><span>Show</span></button><button name="edit"><i class="ti ti-pencil"></i></button><button name="remove"><i class="ti ti-trash red"></i></button>' }
                         ]
                     </script>
                 </ui-component>
             </div>
         </div>
+        <ui-component name="panel" path="common.panel" config="if:settings;title:Application settings" class="hidden">
+            <div style="padding:20px">
+                <ui-component
+                        name="switchbutton"
+                        path="common.darkmode"
+                        config="description:Toggles between dark/light theme;">
+                    Dark theme
+                </ui-component>
+            </div>
+        </ui-component>
     </div>
 </body>
 
 <script>
 
-	var common = {};
+	var common = {
+	    darkmode: false
+	};
 
 	// default empty filter
 	var filter = {
@@ -40,17 +68,109 @@
 	    page: 1
 	};
 
-	function clicked(btnname, row, button, e) {
-		console.log(btnname, row);
+    // Server-side operations only (it disables client-side sorting & filtering).
+    // Note: sort is passed as an array in form of special string 'nameOfColumn_sortOrder', i.e. 'date1_asc'
+	function onFilterSort(type, filter, sort, page) {
+	    console.log('Testing server-side only filter/sort.', type, filter, sort, page);
+
+	    if (type === 'filter') {
+	        SET('filter.values', filter === null ? {} : filter);
+	    } else if (type === 'sort') {
+	        SET('filter.sort', sort === null ? 'date1_desc' : sort[0]);
+	    }
+
+	    refresh();
 	}
 
-	AJAX('POST /api/files', filter, function(value, err, response) {
-        if (err) {
-            console.log('Api fetch failed', err);
-        }
+	function onFilterClick() {
+	    var opt = {};
+		opt.element = $('.filter-button');
+		opt.width = 300;
+		opt.align = 'right';
+		opt.offsetX = -10;
+		opt.items = [
+		    { label: 'From', name: 'from', type: Date, placeholder: 'Date from', format: 'dd.MM.yyyy' },
+		    { label: 'To', name: 'to', type: Date, placeholder: 'Date to', format: 'dd.MM.yyyy' },
+		];
 
-        SET('common.files', value);
+        // bind to filter values
+		opt.value = {
+		    from: filter.values.from,
+		    to: filter.values.to
+		};
+
+		opt.callback = function(value, changed) {
+			console.log(value, changed);
+
+			if (value.from) {
+			    value.from.setHours(0,0,0,0); // from the start of the day
+			    console.log(value.from);
+			    SET('filter.values.from', value.from);
+			}
+			if (value.to) {
+			    value.to.setHours(23, 59, 59, 999); // till end of the day
+			    console.log(value.to);
+			    SET('filter.values.to', value.to);
+			}
+
+			if (Object.keys(value).length === 0) {  // empty filter, reset
+			    SET('filter.values', {});
+			}
+
+			refresh();
+		};
+
+		SETTER('filter', 'show', opt);
+	}
+
+	function onRowClick(btName, row, button, e) {
+		console.log(btName, row);
+
+		if (btName === 'remove') {
+		    SETTER(
+		        true,
+		        'confirm',
+		        'show2',
+		        'Do you want to remove <b>' + row.string1 + '</b> record?',
+		        ['"check-circle" Remove #2BA433', 'Cancel'],
+		        function() {
+		            // TODO call api
+		            console.log('Removed');
+	            }
+	        );
+		}
+
+		refresh();
+	}
+
+	function refresh() {
+		AJAX('POST /api/files', filter, function(value, err, response) {
+            if (err) {
+                console.log('Api fetch failed', err);
+            }
+
+            SET('common.files', value);
+        });
+	}
+
+	function onSettingsClick() {
+	    console.log('clicked settings');
+	    SET('common.panel', 'settings');
+	}
+
+	// Dark-mode toggle
+	WATCH('common.darkmode', function(path, value, type) {
+
+        // Arguments description:
+        // @path {String} Path which has been changed
+        // @value {Object} New value
+        // @type {Number} 0: init, 1: manually, 2: input, 3 default
+
+        $('body').tclass('ui-dark');
     });
+
+	// initial
+	refresh();
 
 </script>
 

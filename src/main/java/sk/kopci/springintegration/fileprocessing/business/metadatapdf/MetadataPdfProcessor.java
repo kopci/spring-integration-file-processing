@@ -1,6 +1,7 @@
 package sk.kopci.springintegration.fileprocessing.business.metadatapdf;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.integration.annotation.Transformer;
@@ -8,6 +9,7 @@ import org.springframework.integration.dsl.IntegrationFlow;
 import org.springframework.integration.handler.LoggingHandler;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.xml.sax.SAXException;
+import sk.kopci.springintegration.fileprocessing.services.ProcessedFileService;
 import sk.kopci.springintegration.fileprocessing.utils.Messages;
 
 import javax.xml.parsers.ParserConfigurationException;
@@ -19,6 +21,9 @@ import java.io.IOException;
 @Slf4j
 @Configuration
 public class MetadataPdfProcessor {
+
+    @Autowired
+    private ProcessedFileService service;
 
     @Bean
     public IntegrationFlow processMetadataPdf() {
@@ -49,6 +54,11 @@ public class MetadataPdfProcessor {
             saxParser.parse(xml, parser);
 
             MetadataPdfDto dto = parser.getDto();
+
+            service.logProcessedFile(
+                    dto.getString1(),
+                    dto.getString2()
+            );
 
             log.info("Processed correctly.");
 

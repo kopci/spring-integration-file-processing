@@ -1,3 +1,4 @@
+
 COMPONENT('datagrid', 'checkbox:true;colwidth:150;schema:default;rowheight:30;minheight:200;clusterize:true;limit:80;rememberfilter:1;filterlabel:Filter;height:auto;margin:0;resize:true;reorder:true;sorting:true;boolean:true,on,yes;pluralizepages:# pages,# page,# pages,# pages;pluralizeitems:# items,# item,# items,# items;remember:true;highlight:false;unhighlight:true;autoselect:false;buttonapply:Apply;buttonreset:Reset;allowtitles:false;fullwidth_xs:false;clickid:id;dirplaceholder:Search;autoformat:1;controls:1;hfuncicon:square-root-alt;pagination:true;ovalue:id;otext:name', function(self, config) {
 
 	var opt = { filter: {}, filtercache: {}, filtercl: {}, filtervalues: {}, scroll: false, selected: {}, operation: '' };
@@ -2568,5 +2569,2330 @@ COMPONENT('datagrid', 'checkbox:true;colwidth:150;schema:default;rowheight:30;mi
 		};
 
 		$(W).on('keydown', current.fn).on('click', current.fn);
+	};
+});
+
+COMPONENT('confirm', function(self, config, cls) {
+
+	var cls2 = '.' + cls;
+	var is;
+	var events = {};
+
+	self.readonly();
+	self.singleton();
+	self.nocompile && self.nocompile();
+
+	self.make = function() {
+
+		self.aclass(cls + ' hidden');
+
+		self.event('click', 'button', function() {
+			self.hide(+$(this).attrd('index'));
+		});
+
+		self.event('click', cls2 + '-close', function() {
+			self.callback = null;
+			self.hide(-1);
+		});
+
+		self.event('click', function(e) {
+			var t = e.target.tagName;
+			if (t !== 'DIV')
+				return;
+			var el = self.find(cls2 + '-body');
+			el.aclass(cls + '-click');
+			setTimeout(function() {
+				el.rclass(cls + '-click');
+			}, 300);
+		});
+	};
+
+	events.keydown = function(e) {
+		var index = e.which === 13 ? 0 : e.which === 27 ? 1 : null;
+		if (index != null) {
+			self.find('button[data-index="{0}"]'.format(index)).trigger('click');
+			e.preventDefault();
+			e.stopPropagation();
+			events.unbind();
+		}
+	};
+
+	events.bind = function() {
+		$(W).on('keydown', events.keydown);
+	};
+
+	events.unbind = function() {
+		$(W).off('keydown', events.keydown);
+	};
+
+	self.show2 = function(message, buttons, fn) {
+		self.show(message, buttons, function(index) {
+			!index && fn();
+		});
+	};
+
+	self.show = self.confirm = function(message, buttons, fn) {
+
+		if (M.scope)
+			self.currscope = M.scope();
+
+		self.callback = fn;
+
+		var builder = [];
+
+		for (var i = 0; i < buttons.length; i++) {
+			var item = buttons[i];
+			var icon = item.match(/"[a-z0-9-\s]+"/);
+			if (icon) {
+
+				var tmp = icon + '';
+				if (tmp.indexOf(' ') == -1)
+					tmp = 'ti ti-' + tmp;
+
+				item = item.replace(icon, '').trim();
+				icon = '<i class="{0}"></i>'.format(tmp.replace(/"/g, ''));
+			} else
+				icon = '';
+
+			var color = item.match(/#[0-9a-f]+/i);
+			if (color)
+				item = item.replace(color, '').trim();
+
+			builder.push('<button data-index="{1}"{3}>{2}{0}</button>'.format(item, i, icon, color ? ' style="background:{0}"'.format(color) : ''));
+		}
+
+		self.content('<div class="{0}-message">{1}</div>{2}'.format(cls, message.replace(/\n/g, '<br />'), builder.join('')));
+	};
+
+	self.hide = function(index) {
+		self.currscope && M.scope(self.currscope);
+		self.callback && self.callback(index);
+		self.rclass(cls + '-visible');
+		events.unbind();
+		setTimeout2(self.id, function() {
+			$('html').rclass(cls + '-noscroll');
+			self.aclass('hidden');
+		}, 1000);
+	};
+
+	self.content = function(text) {
+		$('html').aclass(cls + '-noscroll');
+		!is && self.html('<div><div class="{0}-body"><span class="{0}-close"><i class="ti ti-times"></i></span></div></div>'.format(cls));
+		self.find(cls2 + '-body').append(text);
+		self.rclass('hidden');
+		events.bind();
+		setTimeout2(self.id, function() {
+			self.aclass(cls + '-visible');
+			document.activeElement && document.activeElement.blur();
+		}, 5);
+	};
+});
+
+COMPONENT('filter', 'reset:Reset;apply:Apply;cancel:Cancel', function(self, config, cls) {
+
+	var cls2 = '.' + cls;
+	var events = {};
+	var is = false;
+	var container, timeout, prev;
+	var regnohide = /ui-datepicker|ui-timepicker|ui-directory|ui-filter/g;
+
+	var autohide = function(e) {
+		var tmp = e.target;
+		while (tmp) {
+			if (tmp.tagName === 'BODY' || tmp.tagName === 'HTML' || !tmp.getAttribute)
+				break;
+			var cc = tmp.getAttribute('class');
+			if (regnohide.test(cc))
+				return false;
+			tmp = tmp.parentNode;
+		}
+		return true;
+	};
+
+	self.singleton();
+	self.readonly();
+	self.nocompile && self.nocompile();
+
+	self.bindevents = function() {
+		if (!is) {
+			$(W).on('scroll', events.resize).on('resize', events.resize);
+			$(document).on('click', events.click);
+			is = true;
+		}
+	};
+
+	self.unbindevents = function() {
+		if (is) {
+			is = false;
+			$(W).off('scroll', events.resize).off('resize', events.resize);
+			$(document).off('click', events.click);
+		}
+	};
+
+	events.click = function(e) {
+		if (autohide(e))
+			self.hide(1);
+	};
+
+	self.make = function() {
+		self.aclass(cls + ' hidden');
+		self.append('<div class="' + cls + '-items"></div><div class="' + cls + '-buttons"><button name="reset">{reset}</button><button name="apply"><i class="ti ti-filter"></i>{apply}</button><button name="cancel">{cancel}</button></div>'.arg(config));
+		container = self.find(cls2 + '-items');
+
+		self.event('keydown', 'input', function(e) {
+			if (e.which === 13 && self.opt && self.opt.enter)
+				setTimeout2(self.ID + 'enter', self.apply, 200);
+		});
+
+		self.event('click', 'button', function(e) {
+			e.preventDefault();
+			var t = this;
+			if (t.name === 'cancel') {
+				self.hide(1);
+			} else if (t.name === 'reset') {
+
+				for (var i = 0; i < self.opt.items.length; i++) {
+					var item = self.opt.items[i];
+					var key = item.name || item.label;
+					delete self.opt.value[key];
+				}
+
+				self.opt.callback(self.opt.value, null, null, false);
+				self.hide(1);
+			} else {
+
+				var obj = {};
+				var changed = [];
+				var keys = [];
+				var is = false;
+
+				for (var i = 0; i < self.opt.items.length; i++) {
+					var item = self.opt.items[i];
+					var key = item.name || item.label;
+					if (item.current != undefined) {
+						if (self.opt.clean && item.type === Boolean && item.current === false) {
+							item.current = undefined;
+							delete self.opt.value[key];
+							delete obj[key];
+						} else
+							self.opt.value[key] = obj[key] = item.current;
+						item.changed && changed.push(key);
+					} else {
+						delete self.opt.value[key];
+						item.changed && changed.push(key);
+					}
+
+					keys.push(key);
+				}
+
+				for (var i = 0; i < keys.length; i++) {
+					if (self.opt.value[keys[i]] != null) {
+						is = true;
+						break;
+					}
+				}
+
+				self.opt.callback(self.opt.value, changed, keys, is);
+				self.hide(1);
+			}
+		});
+
+		self.event('change', 'input', function() {
+			var el = $(this);
+			el = el.closest(cls2 + '-item');
+			self.val(el, this.value);
+		});
+
+		self.event('input', 'input', function() {
+			var t = this;
+			if (t.$prev != t.value) {
+				t.$prev = t.value;
+				$(t).closest(cls2 + '-item').find(cls2 + '-placeholder').tclass('hidden', !!t.value);
+			}
+		});
+
+		self.event('click', cls2 + '-checkbox', function() {
+			var el = $(this);
+			var is = !el.hclass(cls + '-checkbox-checked');
+			el = el.closest(cls2 + '-item');
+			self.val(el, is);
+		});
+
+		self.event('click', cls2 + '-icon-click,' + cls2 + '-placeholder', function() {
+
+			var el = $(this).closest(cls2 + '-item');
+			var item = self.opt.items[+el.attrd('index')];
+			var opt;
+
+			if (item.type === Date) {
+				opt = {};
+				opt.offsetX = -5;
+				opt.offsetY = -5;
+				opt.value = item.current || NOW;
+				opt.element = el.find('input');
+				opt.callback = function(date) {
+					self.val(el, date);
+				};
+				SETTER('datepicker', 'show', opt);
+			} else if (item.type instanceof Array) {
+				el.find(cls2 + '-option').trigger('click');
+			} else if (item.type === 'Time') {
+				opt = {};
+				opt.offsetX = -5;
+				opt.offsetY = -5;
+				opt.value = item.current || NOW;
+				opt.element = el.find('input');
+				opt.callback = function(date) {
+					self.val(el, date);
+				};
+				SETTER('timepicker', 'show', opt);
+			} else
+				el.find('input').focus();
+		});
+
+		self.event('click', cls2 + '-option', function() {
+
+			var el = $(this).closest(cls2 + '-item');
+			var item = self.opt.items[+el.attrd('index')];
+			var opt = {};
+
+			opt.element = el;
+			opt.items = item.type;
+			opt.offsetWidth = -20;
+			opt.placeholder = 'Search';
+			opt.offsetX = 10;
+			opt.offsetY = 10;
+			opt.key = item.dirkey;
+
+			if (item.dirempty || item.dirempty === '')
+				opt.empty = item.dirempty || item.placeholder;
+
+			opt.callback = function(selected, el, custom) {
+
+				if (custom)
+					return;
+
+				if (typeof(selected) === 'string')
+					self.val(opt.element, selected);
+				else
+					self.val(opt.element, selected ? selected[item.dirvalue] : null);
+			};
+
+			SETTER('directory', 'show', opt);
+		});
+
+		events.resize = function() {
+			is && self.hide(1);
+		};
+
+		self.on('reflow', events.resize);
+		self.on('scroll', events.resize);
+		self.on('resize', events.resize);
+	};
+
+	self.val = function(el, val, init) {
+
+		var item = self.opt.items[+el.attrd('index')];
+		var type = typeof(val);
+		var tmp;
+
+		if (item.type instanceof Array) {
+			if (typeof(item.type[0]) === 'string') {
+
+				if (val === null) {
+					// EMPTY
+					el.find(cls2 + '-option').html('');
+					item.current = undefined;
+				} else {
+					tmp = item.type.indexOf(val);
+					if (tmp !== -1) {
+						el.find(cls2 + '-option').html(val);
+						item.current = val;
+					}
+				}
+
+			} else {
+				item.current = val;
+				val = val == null ? '' : item.type.findValue(item.dirvalue, val, item.dirkey, '');
+				el.find(cls2 + '-option').html(val);
+			}
+		} else {
+			switch (item.type) {
+				case Date:
+					if (type === 'string')
+						val = val ? val.parseDate(item.format) : '';
+					break;
+				case Number:
+					if (type === 'string')
+						val = val.parseFloat();
+					break;
+				case Boolean:
+					el.find(cls2 + '-checkbox').tclass(cls + '-checkbox-checked', init ? val === true : val);
+					break;
+				case 'Time':
+					if (type === 'string') {
+						val = val ? val.parseDate(item.format) : '';
+						item.current.setHours(val.getHours());
+						item.current.setMinutes(val.getMinutes());
+						item.current.setSeconds(val.getSeconds());
+					}
+					break;
+			}
+			item.current = val;
+			val = val ? item.format ? val.format(item.format) : val : '';
+			item.input && (el.find('input').val(val)[0].$prev = val);
+		}
+
+		if (!init)
+			item.changed = true;
+
+		item.placeholder && el.find(cls2 + '-placeholder').tclass('hidden', !!val);
+	};
+
+	self.show = function(opt) {
+
+		var el = opt.element instanceof jQuery ? opt.element[0] : opt.element.element ? opt.element.dom : opt.element;
+
+		if (is) {
+			clearTimeout(timeout);
+			if (self.target === el) {
+				self.hide(1);
+				return;
+			}
+		}
+
+		if (!opt.value) {
+			if (!el.$filter)
+				el.$filter = {};
+			opt.value = el.$filter;
+		}
+
+		var cache = JSON.stringify(opt.items);
+		var isprerender = false;
+
+		if (cache !== prev) {
+			prev = cache;
+			isprerender = true;
+		}
+
+		var builder = [];
+		for (var i = 0; i < opt.items.length; i++) {
+			var item = opt.items[i];
+			var value = '';
+
+			if (item.type instanceof Array) {
+				value = '<div class="' + cls + '-option"></div>';
+				item.icon = 'chevron-down';
+				item.iconclick = true;
+
+				if (!item.dirkey)
+					item.dirkey = 'name';
+
+				if (!item.dirvalue)
+					item.dirvalue = 'id';
+
+			} else {
+				switch (item.type) {
+					case Date:
+						item.icon = 'calendar';
+						item.input = true;
+						item.iconclick = true;
+						if (!item.format)
+							item.format = 'yyyy–MM–dd';
+						item.maxlength = item.format.length;
+						break;
+					case Number:
+						item.input = true;
+						item.iconclick = true;
+						break;
+					case String:
+						item.input = true;
+						item.iconclick = true;
+						break;
+					case Boolean:
+						value = '<div class="{0}-checkbox"><i class="ti ti-check"></i></div>'.format(cls);
+						break;
+					case 'Time':
+					case 'time':
+						item.input = true;
+						item.iconclick = true;
+						item.icon = 'clock-o';
+						if (!item.format)
+							item.format = 'HH:mm';
+						item.maxlength = item.format.length;
+						break;
+				}
+			}
+
+			if (isprerender) {
+
+				if (item.input) {
+					value = '<input type="text" />';
+					if (item.maxlength)
+						value = value.replace('/>', 'maxlength="' + item.maxlength + '" />');
+				}
+
+				if (item.icon)
+					value = '<div class="{0}-item-icon{3}">{1}</div><div class="{0}-item-input">{2}</div>'.format(cls, item.icon.charAt(0) === '!' ? item.icon.substring(1) : '<i class="ti ti-{0}"></i>'.format(item.icon), value, item.iconclick ? (' ' + cls + '-icon-click') : '');
+
+				builder.push('<div class="{0}-item" data-index="{3}"><div class="{0}-item-label">{1}</div><div class="{0}-item-value"><div class="{0}-placeholder">{4}</div>{2}</div></div>'.format(cls, item.label || item.name, value, i, item.placeholder || ''));
+			}
+
+			if (opt.value && !item.current)
+				item.current = opt.value[item.name];
+		}
+
+		if (isprerender)
+			container.html(builder.join(''));
+
+		if (!opt.value)
+			opt.value = {};
+
+		self.opt = opt;
+		self.target = el;
+
+		self.find(cls2 + '-item').each(function() {
+			var el = $(this);
+			var index = +el.attrd('index');
+			self.val(el, self.opt.items[index].current, true);
+			if (!isprerender) {
+				var t = el.find('input')[0];
+				if (t) {
+					t.$prev = t.value;
+					el.find(cls2 + '-placeholder').tclass('hidden', !!t.value);
+				}
+			}
+		});
+
+		el = $(el);
+		self.rclass('hidden');
+
+		var css = {};
+		var off = el.offset();
+		var w = self.width();
+
+		if (opt.element) {
+			switch (opt.align) {
+				case 'center':
+					css.left = Math.ceil((off.left - w / 2) + (el.innerWidth() / 2));
+					break;
+				case 'right':
+					css.left = (off.left - w) + el.innerWidth();
+					break;
+				default:
+					css.left = off.left;
+					break;
+			}
+
+			css.top = opt.position === 'bottom' ? (off.top - self.element.height() - 10) : (off.top + el.innerHeight() + 10);
+		}
+
+		css.width = opt.width || null;
+
+		if (opt.offsetX)
+			css.left += opt.offsetX;
+
+		if (opt.offsetY)
+			css.top += opt.offsetY;
+
+		if (opt.autofocus !== false)
+			self.autofocus();
+
+		self.element.css(css);
+		self.aclass(cls + '-visible', 100);
+		setTimeout(self.bindevents, 500);
+	};
+
+	self.apply = function() {
+		self.find('button[name="apply"]').trigger('click');
+	};
+
+	self.hide = function(sleep) {
+		if (!is)
+			return;
+		clearTimeout(timeout);
+		timeout = setTimeout(function() {
+			self.unbindevents();
+			self.rclass(cls + '-visible').aclass('hidden');
+			if (self.opt)
+				self.opt = null;
+		}, sleep ? sleep : 100);
+	};
+});
+
+COMPONENT('switchbutton', function(self, config, cls) {
+	self.nocompile();
+
+	self.validate = function(value) {
+		return (config.disabled || !config.required) ? true : value === true;
+	};
+
+	self.configure = function(key, value, init) {
+		switch (key) {
+			case 'disabled':
+				!init && self.tclass('ui-disabled', value);
+				break;
+			case 'invalid':
+				self.tclass(cls + '-invalid', value);
+				break;
+		}
+	};
+
+	self.make = function() {
+		self.aclass(cls);
+		self.html('<div class="{1}-label"><span>{0}</span>{2}</div><label tabindex=0><div class="{1}-slider"></div></label>'.format(self.html(), cls, config.description));
+
+		self.event('click', function() {
+			if (!config.disabled) {
+				self.dirty(false);
+				self.getter(!self.get());
+			}
+		});
+
+		self.event('keydown', 'label', function(e) {
+			if (!config.disabled && e.which === 32) {
+				e.preventDefault();
+				self.dirty(false);
+				self.getter(!self.get());
+			}
+		});
+
+		self.event('focusin focusout', 'label', function(e) {
+			if (config.disabled)
+				return;
+			self.tclass(cls + '-focused', e.type === 'focusin');
+		});
+
+		config.align && self.aclass(cls + '-align-' + config.align);
+		config.border && self.aclass(cls + '-border');
+	};
+
+	self.setter = function(value) {
+		self.tclass(cls + '-checked', value === true);
+	};
+});
+
+COMPONENT('directory', 'minwidth:200;create:Create', function(self, config, cls) {
+
+	var cls2 = '.' + cls;
+	var container, timeout, icon, plus, skipreset = false, skipclear = false, ready = false, input = null, issearch = false;
+	var is = false, selectedindex = 0, resultscount = 0;
+	var templateE = '{{ name | encode | ui_directory_helper }}';
+	var templateR = '{{ name | raw }}';
+	var template = '<li data-index="{{ $.index }}" data-search="{{ $.search }}" class="{{ $.classes }}">{{ if $.checkbox }}<span class="' + cls + '-checkbox"><i class="ti ti-check"></i></span>{{ fi }}{0}</li>';
+	var templateraw = template.format(templateR);
+	var regstrip = /(&nbsp;|<([^>]+)>)/ig;
+	var parentclass = null;
+	var parentclass2 = null;
+	var skiphide = false;
+	var skipmouse = false;
+	var customvalue;
+	var search;
+	var main;
+
+	template = template.format(templateE);
+
+	Thelpers.ui_directory_helper = function(val) {
+		var t = this;
+		return t.template ? (typeof(t.template) === 'string' ? t.template.indexOf('{{') === -1 ? t.template : Tangular.render(t.template, this) : t.render(this, val)) : self.opt.render ? self.opt.render(this, val) : val;
+	};
+
+	self.template = Tangular.compile(template);
+	self.templateraw = Tangular.compile(templateraw);
+
+	self.readonly();
+	self.singleton();
+	self.nocompile();
+
+	self.configure = function(key, value, init) {
+		if (init)
+			return;
+		switch (key) {
+			case 'placeholder':
+				self.find('input').prop('placeholder', value);
+				break;
+		}
+	};
+
+	self.make = function() {
+
+		self.aclass('hidden ' + cls + '-area');
+		self.append('<div class="{1}"><div class="{1}-search"><span class="{1}-add hidden"><i class="ti ti-plus"></i></span><span class="{1}-button"><i class="ti ti-search"></i></span><div><input type="text" placeholder="{0}" class="{1}-search-input" name="dir{2}" autocomplete="new-password" /></div></div><div class="{1}-container"><ul></ul></div></div>'.format(config.placeholder, cls, Date.now()));
+
+		customvalue = $('<li data-index="-2"></li>')[0];
+
+		main = self.find(cls2);
+		container = self.find('ul');
+		input = self.find('input');
+		icon = self.find(cls2 + '-button').find('.ti');
+		plus = self.find(cls2 + '-add');
+		search = self.find(cls2 + '-search');
+
+		self.event('mouseenter mouseleave', 'li', function() {
+			if (ready && !issearch && !skipmouse) {
+				container.find('li.current').rclass('current');
+				$(this).aclass('current');
+				var arr = container.find('li:visible');
+				for (var i = 0; i < arr.length; i++) {
+					if ($(arr[i]).hclass('current')) {
+						selectedindex = i;
+						break;
+					}
+				}
+			}
+		});
+
+		self.element.on('click', function(e) {
+			if (e.target === self.dom)
+				self.hide(1);
+		});
+
+		var skiphidedelay;
+		var skipmousedelay;
+		var skipmousefalse = function() {
+			skipmousedelay = null;
+			skipmouse = false;
+		};
+		var skipmouseforce = function() {
+			skipmouse = true;
+			skipmousedelay && clearTimeout(skipmousedelay);
+			skipmousedelay = setTimeout(skipmousefalse, 500);
+		};
+
+		self.event('focus', 'input', function() {
+
+			skiphide = true;
+			skiphidedelay && clearTimeout(skiphidedelay);
+			skiphidedelay = setTimeout(function() {
+				skiphide = false;
+			}, 800);
+
+			if (self.opt.search === false)
+				$(this).blur();
+		});
+
+		self.event('click', cls2 + '-button', function(e) {
+			skipclear = false;
+			input.val('');
+			self.search();
+			e.stopPropagation();
+			e.preventDefault();
+		});
+
+		self.event('click', cls2 + '-add', function() {
+			if (self.opt.custom && self.opt.callback) {
+				self.opt.scope && M.scope(self.opt.scope);
+				self.opt.callback(input.val(), self.opt.element, true);
+				self.hide();
+			}
+		});
+
+		self.event('click', 'li', function(e) {
+
+			var el = $(this);
+			if (el.hclass('ui-disabled'))
+				return;
+
+			if (self.opt.callback) {
+
+				self.opt.scope && M.scope(self.opt.scope);
+
+				var index = +el.attrd('index');
+				if (index === -2) {
+					self.opt.scope && M.scope(self.opt.scope);
+					self.opt.callback(input.val(), self.opt.element, true);
+					self.hide();
+					return;
+				}
+
+				var item = self.opt.items[index];
+
+				if (self.opt.checkbox) {
+					item.selected = !item.selected;
+
+					if (item.selected)
+						item.selectedts = Date.now();
+					else
+						delete item.selectedts;
+
+					el.tclass('selected', item.selected);
+
+					if (self.opt.checked) {
+						var tmpindex = self.opt.checked.indexOf(item.id);
+						if (item.selected) {
+							if (tmpindex === -1)
+								self.opt.checked.push(item.id);
+						} else if (tmpindex !== -1)
+							self.opt.checked.splice(tmpindex, 1);
+					}
+
+					var response = null;
+
+					if (self.opt.checked) {
+						response = self.opt.checked.slice(0);
+					} else {
+						response = [];
+						for (var i = 0; i < self.opt.items.length; i++) {
+							var m = self.opt.items[i];
+							if (m.selected)
+								response.push(m);
+						}
+					}
+
+					response.quicksort('selectedts');
+					self.opt.callback(response, self.opt.element, false, e);
+				} else
+					self.opt.callback(item, self.opt.element, false, e);
+			}
+
+			is = true;
+
+			if (!self.opt.checkbox) {
+				self.hide(0);
+				e.preventDefault();
+				e.stopPropagation();
+			}
+
+		});
+
+		self.event('keydown', 'input', function(e) {
+			var o = false;
+			switch (e.which) {
+				case 8:
+					skipclear = false;
+					break;
+				case 27:
+					o = true;
+					self.hide();
+					break;
+				case 13:
+					o = true;
+					var sel = self.find('li.current');
+					if (!sel.hclass('ui-disabled'))
+						sel.trigger('click');
+					break;
+				case 38: // up
+					o = true;
+					selectedindex--;
+					if (selectedindex < 0)
+						selectedindex = 0;
+					self.move();
+					break;
+				case 40: // down
+					o = true;
+					selectedindex++;
+					if (selectedindex >= resultscount)
+						selectedindex = resultscount;
+					self.move();
+					break;
+			}
+
+			if (o) {
+				skipmouseforce();
+				e.preventDefault();
+				e.stopPropagation();
+			}
+
+		});
+
+		self.event('input', 'input', function() {
+			issearch = true;
+			setTimeout2(self.ID, self.search, 100, null, this.value);
+		});
+
+		var fn = function() {
+			is && !skiphide && self.hide(1);
+		};
+
+		self.on('reflow + scroll + resize + resize2', fn);
+		$(W).on('scroll', fn);
+	};
+
+	self.move = function() {
+
+		var counter = 0;
+		var scroller = container.parent();
+		var li = container.find('li');
+		var hli = 0;
+		var was = false;
+		var last = -1;
+		var lastselected = 0;
+		var plus = 0;
+
+		for (var i = 0; i < li.length; i++) {
+
+			var el = $(li[i]);
+
+			if (el.hclass('hidden')) {
+				el.rclass('current');
+				continue;
+			}
+
+			var is = selectedindex === counter;
+			el.tclass('current', is);
+
+			if (is) {
+				hli = (el.innerHeight() || 30) + 1;
+				plus = (hli * 2);
+				was = true;
+				var t = (hli * (counter || 1));
+				scroller[0].scrollTop = t - plus;
+			}
+
+			counter++;
+			last = i;
+			lastselected++;
+		}
+
+		if (!was && last >= 0) {
+			selectedindex = lastselected;
+			li.eq(last).aclass('current');
+		}
+	};
+
+	var nosearch = function() {
+		issearch = false;
+	};
+
+	self.nosearch = function() {
+		setTimeout2(self.ID + 'nosearch', nosearch, 500);
+	};
+
+	self.search = function(value) {
+
+		if (!self.opt)
+			return;
+
+		icon.tclass('ti-times', !!value).tclass('ti-search', !value);
+
+		if (self.opt.custom) {
+			plus.tclass('hidden', !value);
+			customvalue.innerHTML = (typeof(self.opt.custom) === 'string' ? self.opt.custom : config.create) + ': <b>' + (value ? Thelpers.encode(value.toString()) : '...') + '</b>';
+		}
+
+		if (!value && !self.opt.ajax) {
+			if (!skipclear)
+				container.find('li').rclass('hidden');
+			if (!skipreset)
+				selectedindex = 0;
+			resultscount = self.opt.items ? self.opt.items.length : 0;
+			customvalue.classList.toggle('hidden', !value);
+			self.move();
+			self.nosearch();
+			return;
+		}
+
+		resultscount = 0;
+		selectedindex = 0;
+
+		if (self.opt.ajax) {
+			var val = value || '';
+			if (self.ajaxold !== val) {
+				self.ajaxold = val;
+				setTimeout2(self.ID, function(val) {
+					self.opt && self.opt.ajax(val, function(items) {
+						var builder = [];
+						var indexer = {};
+						var item;
+						var key = (self.opt.search == true ? self.opt.key : (self.opt.search || self.opt.key)) || 'name';
+
+						for (var i = 0; i < items.length; i++) {
+
+							item = items[i];
+
+							if (self.opt.exclude && self.opt.exclude(item))
+								continue;
+
+							if (self.opt.checked)
+								item.selected = self.opt.checked.indexOf(item.id) !== -1;
+
+							indexer.index = i;
+							indexer.search = item[key] ? item[key].replace(regstrip, '') : '';
+							indexer.checkbox = self.opt.checkbox === true;
+							resultscount++;
+
+							builder.push(self.opt.ta(item, indexer));
+						}
+
+						if (self.opt.empty) {
+							item = {};
+							var tmp = self.opt.raw ? '<b>{0}</b>'.format(self.opt.empty) : self.opt.empty;
+							item[self.opt.key || 'name'] = tmp;
+							if (!self.opt.raw)
+								item.template = '<b>{0}</b>'.format(self.opt.empty);
+							indexer.index = -1;
+							builder.unshift(self.opt.ta(item, indexer));
+						}
+
+						if (customvalue.parentNode)
+							customvalue.parentNode.removeChild(customvalue);
+
+						skipclear = true;
+						self.opt.items = items;
+						container.html(builder);
+
+						if (self.opt.custom) {
+							container.prepend(customvalue);
+							customvalue.classList.toggle('hidden', !value);
+						}
+
+						self.move();
+						self.nosearch();
+					});
+				}, 300, null, val);
+			}
+		} else if (value) {
+
+			value = value.toSearch().split(' ');
+			var arr = container.find('li');
+
+			for (var i = 0; i < arr.length; i++) {
+				var el = $(arr[i]);
+				var val = el.attrd('search') || '';
+				if (!val)
+					continue;
+
+				val = val.toSearch();
+				var is = false;
+
+				for (var j = 0; j < value.length; j++) {
+					if (val.indexOf(value[j]) === -1) {
+						is = true;
+						break;
+					}
+				}
+
+				el.tclass('hidden', is);
+
+				if (!is)
+					resultscount++;
+			}
+
+			customvalue.classList.toggle('hidden', !value);
+			skipclear = true;
+			self.move();
+			self.nosearch();
+		}
+	};
+
+	self.show = function(opt) {
+
+		// opt.element
+		// opt.items
+		// opt.callback(value, el)
+		// opt.offsetX     --> offsetX
+		// opt.offsetY     --> offsetY
+		// opt.offsetWidth --> plusWidth
+		// opt.placeholder
+		// opt.render
+		// opt.custom
+		// opt.minwidth
+		// opt.maxwidth
+		// opt.key
+		// opt.exclude    --> function(item) must return Boolean
+		// opt.search
+		// opt.selected   --> only for String Array "opt.items"
+		// opt.classname
+		// opt.checkbox
+		// opt.checked;
+
+		if (opt.checked == true)
+			opt.checked = [];
+
+		var el = opt.element instanceof jQuery ? opt.element[0] : opt.element;
+
+		if (opt.items == null)
+			opt.items = EMPTYARRAY;
+
+		self.tclass(cls + '-default', !opt.render);
+
+		if (opt.classname) {
+			main.aclass(opt.classname);
+			parentclass = opt.classname;
+		}
+
+		if (opt.class) {
+			main.aclass(opt.class);
+			parentclass2 = opt.class;
+		}
+
+		if (!opt.minwidth)
+			opt.minwidth = config.minwidth;
+
+		if (is) {
+			clearTimeout(timeout);
+			if (self.target === el) {
+				self.hide(1);
+				return;
+			}
+		}
+
+		self.initializing = true;
+		self.target = el;
+		opt.ajax = null;
+		self.ajaxold = null;
+
+		var element = opt.element ? $(opt.element) : null;
+		var callback = opt.callback;
+		var items = opt.items;
+		var type = typeof(items);
+		var item;
+
+		if (type === 'string') {
+			items = opt.items = GET(items);
+			type = typeof(items);
+		}
+
+		if (type === 'function' && callback) {
+			type = '';
+			opt.ajax = items;
+			items = null;
+		}
+
+		if (!items && !opt.ajax) {
+			self.hide(0);
+			return;
+		}
+
+		self.tclass(cls + '-search-hidden', opt.search === false);
+
+		self.opt = opt;
+		opt.class && main.aclass(opt.class);
+		skiphide = true;
+
+		input.val('');
+
+		var builder = [];
+		var selected = null;
+
+		opt.ta = opt.key ? Tangular.compile((opt.raw ? templateraw : template).replace(/\{\{\sname/g, '{{ ' + opt.key)) : opt.raw ? self.templateraw : self.template;
+
+		if (!opt.ajax) {
+			var indexer = {};
+			var key = (opt.search == true ? opt.key : (opt.search || opt.key)) || 'name';
+			for (var i = 0; i < items.length; i++) {
+
+				item = items[i];
+
+				if (typeof(item) === 'string')
+					item = { name: item, id: item, selected: item === opt.selected };
+
+				if (opt.exclude && opt.exclude(item))
+					continue;
+
+				if (item.selected || opt.selected === item) {
+					selected = i;
+					skipreset = true;
+					item.selected = true;
+				} else
+					item.selected = false;
+
+				if (opt.checked && item.selected)
+					opt.checked.push(item.id);
+
+				var c = '';
+
+				if (item.selected)
+					c += (c ? ' ' : 'selected current');
+
+				if (item.classname)
+					c += (c ? ' ' : item.classname);
+
+				if (item.disabled)
+					c += (c ? ' ' : 'ui-disabled');
+
+				indexer.classes = c;
+				indexer.checkbox = opt.checkbox === true;
+				indexer.index = i;
+				indexer.search = item[key] ? item[key].replace(regstrip, '') : '';
+				builder.push(opt.ta(item, indexer));
+			}
+
+			if (opt.empty) {
+				item = {};
+				var tmp = opt.raw ? '<b>{0}</b>'.format(opt.empty) : opt.empty;
+				item[opt.key || 'name'] = tmp;
+				if (!opt.raw)
+					item.template = '<b>{0}</b>'.format(opt.empty);
+				indexer.index = -1;
+				builder.unshift(opt.ta(item, indexer));
+			}
+		}
+
+		self.target = element ? element[0] : null;
+
+		var w = element ? element.width() : config.minwidth;
+		var offset = element ? element.offset() : EMPTYOBJECT;
+		var width = w + (opt.offsetWidth || 0);
+
+		if (opt.minwidth && width < opt.minwidth)
+			width = opt.minwidth;
+		else if (opt.maxwidth && width > opt.maxwidth)
+			width = opt.maxwidth;
+
+		ready = false;
+
+		opt.ajaxold = null;
+		plus.aclass('hidden');
+		self.find('input').prop('placeholder', opt.placeholder || config.placeholder);
+		var scroller = self.find(cls2 + '-container').css('width', width + 30);
+
+		if (customvalue.parentNode)
+			customvalue.parentNode.removeChild(customvalue);
+
+		container.html(builder);
+
+		if (opt.custom)
+			container.prepend(customvalue);
+
+		var options = { left: 0, top: 0, width: width };
+		var height = opt.height || scroller.height();
+
+		scroller.css('height', opt.height || '');
+
+		if (opt.element) {
+			switch (opt.align) {
+				case 'center':
+					options.left = Math.ceil((offset.left - width / 2) + (opt.element.innerWidth() / 2));
+					break;
+				case 'right':
+					options.left = (offset.left - width) + opt.element.innerWidth();
+					break;
+				default:
+					options.left = offset.left;
+					break;
+			}
+
+			options.top = opt.position === 'bottom' ? ((offset.top - height) + element.height()) : offset.top;
+		} else {
+			options.top = opt.y;
+			options.left = opt.x;
+		}
+
+		options.scope = M.scope ? M.scope() : '';
+
+		if (opt.offsetX)
+			options.left += opt.offsetX;
+
+		if (opt.offsetY)
+			options.top += opt.offsetY;
+
+		var mw = width;
+		var mh = scroller.height();
+
+		if (options.left < 0)
+			options.left = 10;
+		else if ((mw + options.left) > WW)
+			options.left = (WW - mw) - 10;
+
+		mh += search.height();
+
+		if ((mh + options.top) > WH)
+			options.top = (WH - mh) - 10;
+
+		if (options.top < 10)
+			options.top = 10;
+
+		main.css(options);
+
+		!isMOBILE && setTimeout(function() {
+			if (opt.search !== false)
+				input.focus();
+		}, 200);
+
+		setTimeout(function() {
+			self.initializing = false;
+			skiphide = false;
+			is = true;
+
+			if (selected) {
+				var h = container.find('li:first-child').innerHeight() + 1;
+				var y = (container.find('li.selected').index() * h) - (h * 2);
+				scroller[0].scrollTop = y < 0 ? 0 : y;
+			} else
+				scroller[0].scrollTop = 0;
+
+			ready = true;
+			self.rclass('invisible');
+
+		}, 100);
+
+		if (is) {
+			self.search();
+			return;
+		}
+
+		selectedindex = selected || 0;
+		resultscount = items ? items.length : 0;
+		skipclear = true;
+
+		self.search();
+		self.aclass('invisible');
+		self.rclass('hidden');
+
+		setTimeout(function() {
+			if (self.opt && ((self.opt.x != null && self.opt.y != null) || (self.target && self.target.offsetParent)))
+				main.aclass(cls + '-visible');
+			else
+				self.hide(1);
+		}, 100);
+
+		skipreset = false;
+	};
+
+	self.hide = function(sleep) {
+
+		if (!is || self.initializing)
+			return;
+
+		clearTimeout(timeout);
+		timeout = setTimeout(function() {
+
+			self.rclass(cls + '-visible').aclass('hidden');
+
+			if (parentclass) {
+				main.rclass(parentclass);
+				parentclass = null;
+			}
+
+			if (parentclass2) {
+				main.rclass(parentclass2);
+				parentclass2 = null;
+			}
+
+			if (self.opt) {
+				self.opt.close && self.opt.close();
+				self.opt = null;
+			}
+
+			is = false;
+
+		}, sleep ? sleep : 100);
+	};
+});
+
+COMPONENT('datepicker', 'today:Set today;clear:Clear;firstday:0', function(self, config, cls) {
+
+	var cls2 = '.' + cls;
+	var skip = false;
+	var visible = false;
+	var current;
+	var elyears, elmonths, elbody;
+	var main;
+
+	self.days = EMPTYARRAY;
+	self.days_short = EMPTYARRAY;
+	self.months = EMPTYARRAY;
+	self.months_short = EMPTYARRAY;
+	self.years_from;
+	self.years_to;
+
+	self.singleton();
+	self.readonly();
+	self.nocompile();
+
+	self.configure = function(key, value) {
+		switch (key) {
+			case 'days':
+
+				if (value instanceof Array)
+					self.days = value;
+				else
+					self.days = value.split(',').trim();
+
+				self.days_short = [];
+
+				for (var i = 0; i < DAYS.length; i++) {
+					DAYS[i] = self.days[i];
+					self.days_short[i] = DAYS[i].substring(0, 2).toUpperCase();
+				}
+
+				break;
+
+			case 'months':
+				if (value instanceof Array)
+					self.months = value;
+				else
+					self.months = value.split(',').trim();
+
+				self.months_short = [];
+
+				for (var i = 0, length = self.months.length; i < length; i++) {
+					var m = self.months[i];
+					MONTHS[i] = m;
+					if (m.length > 4)
+						m = m.substring(0, 3) + '.';
+					self.months_short.push(m);
+				}
+				break;
+
+			case 'yearfrom':
+				if (value.indexOf('current') !== -1)
+					self.years_from = +(NOW.format('yyyy'));
+				else
+					self.years_from = +(NOW.add(value).format('yyyy'));
+				break;
+
+			case 'yearto':
+				if (value.indexOf('current') !== -1)
+					self.years_to = +(NOW.format('yyyy'));
+				else
+					self.years_to = +(NOW.add(value).format('yyyy'));
+				break;
+		}
+	};
+
+	function getMonthDays(dt) {
+
+		var m = dt.getMonth();
+		var y = dt.getFullYear();
+
+		if (m === -1) {
+			m = 11;
+			y--;
+		}
+
+		return (32 - new Date(y, m, 32).getDate());
+	}
+
+	self.calculate = function(year, month, selected) {
+
+		var d = new Date(year, month, 1, 12, 0);
+		var output = { header: [], days: [], month: month, year: year };
+		var firstday = config.firstday;
+		var firstcount = 0;
+		var frm = d.getDay() - firstday;
+		var today = NOW;
+		var ty = today.getFullYear();
+		var tm = today.getMonth();
+		var td = today.getDate();
+		var sy = selected ? selected.getFullYear() : -1;
+		var sm = selected ? selected.getMonth() : -1;
+		var sd = selected ? selected.getDate() : -1;
+		var days = getMonthDays(d);
+
+		if (frm < 0)
+			frm = 7 + frm;
+
+		while (firstcount++ < 7) {
+			output.header.push({ index: firstday, name: self.days_short[firstday] });
+			firstday++;
+			if (firstday > 6)
+				firstday = 0;
+		}
+
+		var index = 0;
+		var indexEmpty = 0;
+		var count = 0;
+		var prev = getMonthDays(new Date(year, month - 1, 1, 12, 0)) - frm;
+		var cur;
+
+		for (var i = 0; i < days + frm; i++) {
+
+			var obj = { today: false, selected: false, empty: false, future: false, number: 0, index: ++count };
+
+			if (i >= frm) {
+				obj.number = ++index;
+				obj.selected = sy === year && sm === month && sd === index;
+				obj.today = ty === year && tm === month && td === index;
+				obj.future = ty < year;
+				if (!obj.future && year === ty) {
+					if (tm < month)
+						obj.future = true;
+					else if (tm === month)
+						obj.future = td < index;
+				}
+
+			} else {
+				indexEmpty++;
+				obj.number = prev + indexEmpty;
+				obj.empty = true;
+				cur = d.add('-' + indexEmpty + ' days');
+			}
+
+			if (!obj.empty)
+				cur = d.add(i + ' days');
+
+			obj.month = i >= frm && obj.number <= days ? d.getMonth() : cur.getMonth();
+			obj.year = i >= frm && obj.number <= days ? d.getFullYear() : cur.getFullYear();
+			obj.date = cur;
+			output.days.push(obj);
+		}
+
+		indexEmpty = 0;
+
+		for (var i = count; i < 42; i++) {
+			var cur = d.add(i + ' days');
+			var obj = { today: false, selected: false, empty: true, future: true, number: ++indexEmpty, index: ++count };
+			obj.month = cur.getMonth();
+			obj.year = cur.getFullYear();
+			obj.date = cur;
+			output.days.push(obj);
+		}
+
+		return output;
+	};
+
+	self.hide = function() {
+		if (visible) {
+			self.unbindevents();
+			self.opt.close && self.opt.close();
+			self.opt = null;
+			self.older = null;
+			self.target = null;
+			self.aclass('hidden');
+			self.rclass(cls + '-visible');
+			visible = false;
+		}
+		return self;
+	};
+
+	self.show = function(opt) {
+
+		setTimeout(function() {
+			clearTimeout2('datepickerhide');
+		}, 5);
+
+		var el = $(opt.element);
+		var dom = el[0];
+
+		if (self.target === dom) {
+			self.hide();
+			return;
+		}
+
+		if (self.opt && self.opt.close)
+			self.opt.close();
+
+		var off = el.offset();
+		var w = el.innerWidth();
+		var h = el.innerHeight();
+		var l = 0;
+		var t = 0;
+		var height = 305 + (opt.cancel ? 25 : 0);
+		var s = 250;
+
+		if (opt.element) {
+			switch (opt.align) {
+				case 'center':
+					l = Math.ceil((off.left - s / 2) + (w / 2));
+					break;
+				case 'right':
+					l = (off.left + w) - s;
+					break;
+				default:
+					l = off.left;
+					break;
+			}
+
+			t = opt.position === 'bottom' ? (off.top - height) : (off.top + h + 12);
+		}
+
+		if (opt.offsetX)
+			l += opt.offsetX;
+
+		if (opt.offsetY)
+			t += opt.offsetY;
+
+		if ((l + s) > WW)
+			l = (l + w) - s;
+
+		if ((t + height) > WH)
+			t = WH - height - 10;
+
+		var restrict = true;
+		var parent = dom.parentNode;
+
+		while (parent) {
+			if (parent.tagName === 'BODY') {
+				restrict = false;
+				break;
+			}
+			if (parent.classList.contains('ui-scrollbar-area'))
+				break;
+			parent = parent.parentNode;
+		}
+
+		if (restrict && (t + height) > WH)
+			t = (t + h) - height;
+
+		var dt = typeof(opt.value) === 'string' ? GET(opt.value) : opt.value;
+		if ((!(dt instanceof Date)) || isNaN(dt.getTime()))
+			dt = NOW;
+
+		opt.scope = M.scope ? M.scope() : '';
+		self.opt = opt;
+		self.time = dt.format('HH:mm:ss');
+		self.rclass('hidden');
+		self.date(dt);
+		main.css({ left: l, top: t });
+		main.aclass(cls + '-visible', 50);
+		self.bindevents();
+		self.target = dom;
+		visible = true;
+	};
+
+	self.setdate = function(dt) {
+
+		if (!dt) {
+			if (typeof(self.opt.value) === 'string')
+				SET(self.opt.value + ' @change', dt);
+			else
+				self.opt.callback(dt);
+			return;
+		}
+
+		var time = self.time.split(':');
+
+		if (time.length > 1) {
+			dt.setHours(+(time[0] || '0'));
+			dt.setMinutes(+(time[1] || '0'));
+			dt.setSeconds(+(time[2] || '0'));
+		}
+
+		self.opt.scope && M.scope(self.opt.scope);
+
+		if (typeof(self.opt.value) === 'string')
+			SET(self.opt.value + ' @change', dt);
+		else
+			self.opt.callback(dt);
+	};
+
+	self.make = function() {
+
+		self.aclass(cls + '-container hidden');
+
+		var conf = {};
+		var reconfigure = false;
+
+		if (!config.days) {
+			conf.days = [];
+			for (var i = 0; i < DAYS.length; i++)
+				conf.days.push(DAYS[i]);
+			reconfigure = true;
+		}
+
+		if (!config.months) {
+			conf.months = MONTHS;
+			reconfigure = true;
+		}
+
+		reconfigure && self.reconfigure(conf);
+		W.$datepicker = self;
+
+		self.event('click', function(e) {
+			e.stopPropagation();
+		});
+
+		var hide = function() {
+			visible && W.$datepicker && W.$datepicker.hide();
+		};
+
+		var hide2 = function() {
+			visible && setTimeout2('datepickerhide', function() {
+				W.$datepicker && W.$datepicker.hide();
+			}, 20);
+		};
+
+		self.bindevents = function() {
+			if (!visible)
+				$(W).on('scroll', hide2);
+		};
+
+		self.unbindevents = function() {
+			if (visible)
+				$(W).off('scroll', hide2);
+		};
+
+		self.element.on('click', function(e) {
+			if (e.target === self.dom)
+				hide();
+		});
+
+		self.on('reflow + scroll + resize + resize2', hide);
+	};
+
+	self.makehtml = function() {
+		var builder = [];
+		builder.push('<div class="{0}-header"><span class="{0}-next"><i class="ti ti-angle-right"></i></span><span class="{0}-prev"><i class="ti ti-angle-left"></i></span><div class="{0}-info"><span class="{0}-month">---</span><span class="{0}-year">---</span></div></div><div class="{0}-years hidden"></div><div class="{0}-months"></div><div class="{0}-body hidden"><div class="{0}-week">'.format(cls));
+		for (var i = 0; i < 7; i++)
+			builder.push('<div></div>');
+		builder.push('</div><div class="{0}-days">'.format(cls));
+
+		var clearbtn = self.opt.clear === false ? null : '<span>{1}</span>'.format(cls, config.clear);
+
+		for (var i = 0; i < 42; i++)
+			builder.push('<div class="{0}-date"><div></div></div>'.format(cls, i));
+		builder.push('</div></div><div class="{0}-footer"><span class="{0}-now">{2}</span><span class="{0}-clear">{3}</span></div>'.format(cls, config.close, config.today, clearbtn));
+
+		self.html('<div class="{0}">{1}</div>'.format(cls, builder.join('')));
+		main = $(self.find(cls2)[0]);
+
+		builder = [];
+		elbody = self.find(cls2 + '-body');
+		elmonths = self.find(cls2 + '-months');
+		for (var i = 0; i < 12; i++)
+			builder.push('<div class="{0}-month" data-index="{1}"><div></div></div>'.format(cls, i));
+		elmonths.html(builder.join(''));
+
+		builder = [];
+		elyears = self.find(cls2 + '-years');
+		for (var i = 0; i < 25; i++)
+			builder.push('<div class="{0}-year"><div></div></div>'.format(cls));
+		elyears.html(builder.join(''));
+
+		self.makehtml = null;
+
+		self.find(cls2 + '-month').on('click', function(e) {
+
+			var el = $(this);
+			var index = el.attrd('index');
+			var h = 'hidden';
+
+			if (index) {
+				current.setMonth(+index);
+				self.date(current, true);
+			} else if (!elmonths.hclass(h))
+				index = 1;
+
+			elyears.aclass(h);
+
+			if (index)
+				elmonths.aclass(h);
+			else {
+				elmonths.find(cls2 + '-today').rclass(cls + '-today');
+				elmonths.find(cls2 + '-month').eq(current.getMonth()).aclass(cls + '-today');
+				elmonths.rclass(h);
+			}
+
+			elbody.tclass(h, !elmonths.hclass(h));
+			e.preventDefault();
+			e.stopPropagation();
+
+		});
+
+		self.find(cls2 + '-year').on('click', function(e) {
+			var el = $(this);
+			var year = el.attrd('year');
+			var h = 'hidden';
+
+			if (year) {
+				current.setFullYear(+year);
+				self.date(current, true);
+			} else if (!elyears.hclass(h))
+				year = 1;
+
+			elmonths.aclass(h);
+
+			if (year)
+				elyears.aclass(h);
+			else {
+				self.years();
+				elyears.rclass(h);
+			}
+
+			elbody.tclass(h, !elyears.hclass(h));
+			e.preventDefault();
+			e.stopPropagation();
+		});
+
+		self.years = function() {
+			var dom = self.find(cls2 + '-years').find(cls2 + '-year');
+			var year = current.getFullYear();
+			var index = 12;
+			for (var i = 0; i < 25; i++) {
+				var val = year - (index--);
+				$(dom[i]).tclass(cls + '-today', val === year).attrd('year', val).find('div')[0].innerHTML = val;
+			}
+		};
+
+		self.find(cls2 + '-date').on('click', function() {
+			var dt = $(this).attrd('date').split('-');
+			self.setdate(new Date(+dt[0], +dt[1], +dt[2], 12, 0, 0));
+			self.hide();
+		});
+
+		self.find(cls2 + '-now').on('click', function() {
+			self.setdate(new Date());
+			self.hide();
+		});
+
+		self.find(cls2 + '-clear').on('click', function() {
+			self.setdate(null);
+			self.hide();
+		});
+
+		self.find(cls2 + '-next').on('click', function(e) {
+
+			if (elyears.hclass('hidden')) {
+				current.setMonth(current.getMonth() + 1);
+				self.date(current, true);
+			} else {
+				current.setFullYear(current.getFullYear() + 25);
+				self.years();
+			}
+
+			e.preventDefault();
+			e.stopPropagation();
+		});
+
+		self.find(cls2 + '-prev').on('click', function(e) {
+
+			if (elyears.hclass('hidden')) {
+				current.setMonth(current.getMonth() - 1);
+				self.date(current, true);
+			} else {
+				current.setFullYear(current.getFullYear() - 25);
+				self.years();
+			}
+
+			e.preventDefault();
+			e.stopPropagation();
+		});
+	};
+
+	self.date = function(value, skipday) {
+
+		var clssel = cls + '-selected';
+
+		self.makehtml && self.makehtml();
+
+		if (typeof(value) === 'string')
+			value = value.parseDate();
+
+		var year = value == null ? null : value.getFullYear();
+		if (year && (year < self.years_from || year > self.years_to))
+			return;
+
+		if (!value || isNaN(value.getTime())) {
+			self.find('.' + clssel).rclass(clssel);
+			value = NOW;
+		}
+
+		var empty = !value;
+
+		if (skipday) {
+			skipday = false;
+			empty = true;
+		}
+
+		if (skip) {
+			skip = false;
+			return;
+		}
+
+		value = new Date((value || NOW).getTime());
+
+		var output = self.calculate(value.getFullYear(), value.getMonth(), value);
+		var dom = self.find(cls2 + '-date');
+
+		self.find(cls2 + '-body').rclass('hidden');
+		self.find(cls2 + '-months,' + cls2 + '-years').aclass('hidden');
+
+		current = value;
+
+		for (var i = 0; i < 42; i++) {
+
+			var item = output.days[i];
+			var classes = [cls + '-date'];
+
+			if (item.empty)
+				classes.push(cls + '-disabled');
+
+			if (!empty && item.selected)
+				classes.push(cls + '-selected');
+
+			if (item.today)
+				classes.push(cls + '-day-today');
+
+			var el = $(dom[i]);
+			el.attrd('date', item.year + '-' + item.month + '-' + item.number);
+			el.find('div').html(item.number);
+			el.find('i').remove();
+			el.rclass().aclass(classes.join(' '));
+		}
+
+		if (!skipday) {
+
+			dom = self.find(cls2 + '-week').find('div');
+			for (var i = 0; i < 7; i++)
+				dom[i].innerHTML = output.header[i].name;
+
+			dom = self.find(cls2 + '-months').find(cls2 + '-month');
+			for (var i = 0; i < 12; i++)
+				$(dom[i]).find('div').attrd('index', i)[0].innerHTML = self.months_short[i];
+		}
+
+		self.opt.badges && self.opt.badges(current, function(date) {
+
+			if (!(date instanceof Array))
+				date = [date];
+
+			for (var i = 0; i < date.length; i++) {
+				var dt = date[i].getFullYear() + '-' + date[i].getMonth() + '-' + date[i].getDate();
+				var el = self.find(cls2 + '-date[data-date="{0}"]'.format(dt));
+				if (el.length && !el.find('i').length)
+					el.append('<i class="ti ti-circle-alt"></i>');
+			}
+
+		});
+
+		var info = self.find(cls2 + '-info');
+		info.find(cls2 + '-month').html(self.months[current.getMonth()]);
+		info.find(cls2 + '-year').html(current.getFullYear());
+
+	};
+});
+
+COMPONENT('timepicker', function(self, config, cls) {
+
+	var cls2 = '.' + cls;
+	var bindedevents = false;
+	var timeout = 0;
+	var is;
+
+	self.readonly();
+	self.singleton();
+	self.nocompile && self.nocompile();
+
+	self.make = function() {
+
+		self.aclass(cls + ' hidden');
+		self.append('<div class="{0}-hours"><i class="ti ti-chevron-up"></i><input type="text" maxlength="2" /><i class="ti ti-chevron-down"></i></div><div class="{0}-minutes"><i class="ti ti-chevron-up"></i><input type="text" maxlength="2" /><i class="ti ti-chevron-down"></i></div><div class="{0}-seconds hidden"><i class="ti ti-chevron-up"></i><input type="text" maxlength="2" /><i class="ti ti-chevron-down"></i></div><div class="{0}-ampm hidden"><i class="ti ti-chevron-up"></i><span>AM</span><i class="ti ti-chevron-down"></i></div>'.format(cls));
+
+		var fn = function(e) {
+			if (is && (e.type !== 'keydown' || e.which === 27))
+				self.hide(1);
+		};
+
+		self.on('reflow', fn);
+		self.on('scroll', fn);
+		self.on('resize', fn);
+
+		self.event('keydown', 'input', function(e) {
+			var code = e.which;
+
+			if (code === 38 || code === 40) {
+				e.preventDefault();
+				$(this).parent().find('.ti-chevron-' + (code === 38 ? 'up' : 'down')).trigger('click');
+				return;
+			}
+
+			if (code === 13 || code === 27) {
+				self.hide(1);
+				return;
+			}
+
+			if ((code === 9 || code === 8 || code === 37 || code === 39 || code === 27 || (code > 47 && code < 58))) {
+				if (code > 47 || code === 8)
+					self.update();
+			} else
+				e.preventDefault();
+		});
+
+		self.event('click', 'i', function() {
+
+			var el = $(this);
+			var parent = el.parent();
+			var cls = parent.attr('class');
+			var up = el.hclass('ti-chevron-up');
+			var type = cls.substring(cls.lastIndexOf('-') + 1);
+			var val;
+
+			switch (type) {
+				case 'hours':
+				case 'minutes':
+				case 'seconds':
+					var input = parent.find('input');
+					val = +input.val();
+
+					if (up)
+						val++;
+					else
+						val--;
+
+					if (val < 0) {
+						if (type === 'hours')
+							val = self.opt.ampm ? 12 : 23;
+						else
+							val = 59;
+					} else {
+						if (type === 'hours') {
+							if (self.opt.ampm) {
+								if (val > 12)
+									val = 0;
+							} else if (val > 23)
+								val = 0;
+						} else {
+							if (val > 59)
+								val = 0;
+						}
+					}
+
+					val = val.toString();
+					input.val(self.opt.ampm ? val : (val.length > 1 ? val : ('0' + val)));
+					break;
+				case 'ampm':
+					var span = self.find('span');
+					val = span.text().toLowerCase();
+					if (val === 'am')
+						val = 'PM';
+					else
+						val = 'AM';
+					span.html(val);
+					break;
+			}
+
+			self.update();
+		});
+
+		self.update = function() {
+			setTimeout2(self.ID, function() {
+
+				var current = self.opt.current;
+				var h = +(self.find(cls2 + '-hours input').val() || '0');
+				var m = +(self.find(cls2 + '-minutes input').val() || '0');
+				var s = +(self.find(cls2 + '-seconds input').val() || '0');
+				var ampm = +self.find(cls2 + '-ampm span').html().toLowerCase();
+
+				if (!self.opt.seconds)
+					s = 0;
+
+				if (ampm === 'pm')
+					h += 12;
+
+				current.setHours(h);
+				current.setMinutes(m);
+				current.setSeconds(s);
+
+				if (self.opt.callback)
+					self.opt.callback(current);
+				else if (self.opt.path)
+					SET(self.opt.path, current);
+
+			}, 500);
+		};
+
+		self.event('click', function(e) {
+			e.preventDefault();
+			e.stopPropagation();
+		});
+
+		self.bindevents = function() {
+			if (!bindedevents) {
+				bindedevents = true;
+				$(document).on('click', fn);
+				$(W).on('scroll', fn).on('keydown', fn);
+			}
+		};
+
+		self.unbindevents = function() {
+			if (bindedevents) {
+				bindedevents = false;
+				$(document).off('click', fn);
+				$(W).off('scroll', fn).off('keydown', fn);
+			}
+		};
+	};
+
+	self.show = self.toggle = function(opt) {
+
+		var el = opt.element;
+		if (el instanceof jQuery)
+			el = el[0];
+
+		if (self.target === el) {
+			self.hide(0);
+			return;
+		}
+
+		var value = opt.value || opt.date || opt.time || NOW;
+
+		if (typeof(value) === 'string') {
+			opt.path = value;
+			value = GET(value);
+		}
+
+		var count = 0;
+
+		if (opt.ampm == null)
+			opt.ampm = !!config.ampm;
+
+		if (opt.seconds == null)
+			opt.seconds = !!config.seconds;
+
+		self.find(cls2 + '-seconds').tclass('hidden', !opt.seconds);
+		self.find(cls2 + '-ampm').tclass('hidden', !opt.ampm);
+
+		if (opt.seconds)
+			count++;
+
+		if (opt.ampm)
+			count++;
+
+		var ampm = opt.ampm;
+
+		self.find(cls2 + '-hours input').val(value.format(ampm ? '!H' : 'HH'));
+		self.find(cls2 + '-minutes input').val(value.format(ampm ? 'm' : 'mm'));
+		self.find(cls2 + '-seconds input').val(value.format(ampm ? 's' : 'ss'));
+		self.find(cls2 + '-ampm span').html(value.format('a').toUpperCase());
+
+		opt.current = value;
+		self.target = el;
+		self.opt = opt;
+		self.bindevents();
+
+		el = $(el);
+		var off = el.offset();
+
+		if (opt.offsetX)
+			off.left += opt.offsetX;
+
+		if (opt.offsetY)
+			off.top += opt.offsetY;
+
+		off.top += el.innerHeight() + 12;
+		self.element.css(off);
+		self.rclass2(cls + '-').tclass(cls + '-' + count).rclass('hidden').aclass(cls + '-visible', 100);
+		clearTimeout(timeout);
+
+		setTimeout(function() {
+			is = true;
+		}, 500);
+	};
+
+	self.hide = function(sleep) {
+
+		if (!is) {
+			self.target = null;
+			return;
+		}
+
+		clearTimeout(timeout);
+		timeout = setTimeout(function() {
+
+			self.unbindevents();
+
+			if (self.opt) {
+				self.opt.close && self.opt.close();
+				self.opt.close = null;
+			}
+
+			self.rclass(cls + '-visible').aclass('hidden');
+			self.target = null;
+			is = false;
+		}, sleep ? sleep : 100);
+	};
+
+});
+
+COMPONENT('panel', 'width:350;icon:home;zindex:12;scrollbar:true;scrollbarY:true;margin:0;padding:20;closeicon:ti ti-times', function(self, config, cls) {
+
+	var cls2 = '.' + cls;
+
+	if (!W.$$panel) {
+
+		W.$$panel_level = W.$$panel_level || 1;
+		W.$$panel = true;
+
+		$(document).on('click touchend', cls2 + '-button-close,' + cls2 + '-container', function(e) {
+			var target = $(e.target);
+			var curr = $(this);
+			var main = target.hclass(cls + '-container');
+			if (curr.hclass(cls + '-button-close') || main) {
+				var parent = target.closest(cls2 + '-container');
+				var com = parent.component();
+				if (!main || com.config.bgclose) {
+
+					if (com.config.close)
+						com.EXEC(com.config.close, com);
+					else
+						com.hide();
+
+					e.preventDefault();
+					e.stopPropagation();
+				}
+			}
+		});
+
+		var resize = function() {
+			SETTER('panel/resize');
+		};
+
+		ON('resize + resize2', function() {
+			setTimeout2('panelresize', resize, 100);
+		});
+	}
+
+	self.icon = function(value, path, el) {
+		el.rclass().aclass(cls + '-icon ' + self.faicon(value.icon));
+	};
+
+	self.readonly();
+
+	self.esc = function(bind) {
+		if (bind) {
+			if (!self.$esc) {
+				self.$esc = true;
+				$(W).on('keydown', self.esc_keydown);
+			}
+		} else {
+			if (self.$esc) {
+				self.$esc = false;
+				$(W).off('keydown', self.esc_keydown);
+			}
+		}
+	};
+
+	self.esc_keydown = function(e) {
+		if (e.which === 27 && !e.isPropagationStopped()) {
+			var val = self.get();
+			if (!val || config.if === val) {
+				e.preventDefault();
+				e.stopPropagation();
+				self.hide();
+			}
+		}
+	};
+
+	self.hide = function() {
+		self.set('');
+	};
+
+	self.resize = function() {
+		var el = self.element.find(cls2 + '-body');
+		var h = WH - self.find(cls2 + '-header').height() - (config.padding * 2);
+		el.height(h);
+		self.find(cls2).css('max-width', isMOBILE ? WW - 40 : '');
+		config.container && el.find(config.container).height(h - config.margin);
+		self.scrollbar && self.scrollbar.resize();
+	};
+
+	self.make = function() {
+
+		var scr = self.find('> script');
+		self.template = scr.length ? scr.html() : '';
+		$(document.body).append('<div id="{0}" class="hidden {5}-container{3}"><div class="{5}" style="max-width:{1}px"><div data-bind="@config__change .ui-panel-icon:@icon__html span:value.title" class="{5}-title"><button name="cancel" class="{5}-button-close{2}"><i class="{6}"></i></button><button name="menu" class="{5}-button-menu{4}"><i class="ti ti-ellipsis-h"></i></button><i class="{5}-icon"></i><span></span></div><div class="{5}-header"></div><div class="{5}-body"></div></div>'.format(self.ID, config.width, config.closebutton == false ? ' hidden' : '', config.bg ? '' : ' ui-panel-inline', config.menu ? '' : ' hidden', cls, config.closeicon));
+		var el = $('#' + self.ID);
+		var body = el.find(cls2 + '-body');
+
+		while (self.dom.children.length)
+			body[0].appendChild(self.dom.children[0]);
+
+		self.rclass('hidden');
+		self.replace(el, true);
+
+		if (config.scrollbar && W.SCROLLBAR) {
+			if (config.container)
+				body = body.find(config.container);
+			self.scrollbar = SCROLLBAR(body, { shadow: config.scrollbarshadow, visibleY: !!config.scrollbarY, orientation: 'y' });
+			self.scrollleft = self.scrollbar.scrollLeft;
+			self.scrolltop = self.scrollbar.scrollTop;
+			self.scrollright = self.scrollbar.scrollRight;
+			self.scrollbottom = self.scrollbar.scrollBottom;
+		} else
+			body.aclass(cls + '-scroll');
+
+		self.event('click', 'button[name],.cancel', function() {
+			switch (this.name) {
+				case 'menu':
+					self.EXEC(config.menu, $(this), self);
+					break;
+				case 'cancel':
+					self.hide();
+					break;
+				default:
+					if ($(this).hclass('cancel'))
+						self.hide();
+					break;
+			}
+		});
+
+		self.resize();
+	};
+
+	self.configure = function(key, value, init) {
+		switch (key) {
+			case 'bg':
+				self.tclass(cls + '-inline', !value);
+				self.element.css('max-width', value ? 'inherit' : (config.width + 1));
+				break;
+			case 'closebutton':
+				!init && self.find(cls2 + '-button-close').tclass(value !== true);
+				break;
+			case 'width':
+				self.element.css('max-width', config.bg ? 'inherit' : value);
+				self.find(cls2 + '').css('max-width', value);
+				break;
+		}
+	};
+
+	self.setter = function(value) {
+
+		setTimeout2(cls + '-noscroll', function() {
+			$('html').tclass(cls + '-noscroll', !!$(cls2 + '-container').not('.hidden').length);
+		}, 50);
+
+		var isHidden = value !== config.if;
+
+		if (self.hclass('hidden') === isHidden) {
+			if (!isHidden) {
+				config.reload && self.EXEC(config.reload, self);
+				config.default && DEFAULT(self.makepath(config.default), true);
+			}
+			return;
+		}
+
+		setTimeout2('panelreflow', function() {
+			EMIT('reflow', self.name);
+		}, 10);
+
+		if (isHidden) {
+			self.aclass('hidden');
+			self.release(true);
+			self.esc(false);
+			self.rclass(cls + '-animate');
+			W.$$panel_level--;
+			return;
+		}
+
+		if (self.template) {
+			var is = self.template.COMPILABLE();
+			self.find('div[data-jc-replaced]').html(self.template);
+			self.template = null;
+			is && COMPILE();
+		}
+
+		if (W.$$panel_level < 1)
+			W.$$panel_level = 1;
+
+		W.$$panel_level++;
+
+		var container = self.element.find(cls2 + '-body');
+		self.css('z-index', W.$$panel_level * config.zindex);
+		container.scrollTop(0);
+		self.rclass('hidden');
+		self.release(false);
+		setTimeout(self.resize, 100);
+
+		config.reload && self.EXEC(config.reload, self);
+		config.refresh && self.EXEC(config.refresh, self);
+		config.default && DEFAULT(self.makepath(config.default), true);
+
+		setTimeout(function() {
+			if (self.scrollbar)
+				self.scrollbar.scroll(0, 0);
+			else
+				container.scrollTop(0);
+			self.aclass(cls + '-animate');
+			config.autofocus && self.autofocus(config.autofocus);
+		}, 300);
+
+		// Fixes a problem with freezing of scrolling in Chrome
+		setTimeout2(self.id, function() {
+			self.css('z-index', (W.$$panel_level * config.zindex) + 1);
+		}, 1000);
+
+		config.closeesc && self.esc(true);
 	};
 });

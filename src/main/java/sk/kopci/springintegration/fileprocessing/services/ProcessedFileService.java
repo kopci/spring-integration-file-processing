@@ -11,6 +11,8 @@ import sk.kopci.springintegration.fileprocessing.persistance.dtos.ProcessedFiles
 import sk.kopci.springintegration.fileprocessing.services.dtos.Filter;
 import sk.kopci.springintegration.fileprocessing.services.dtos.ProcessedFilesResponse;
 
+import java.time.LocalDateTime;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -45,6 +47,16 @@ public class ProcessedFileService {
         response.setPage(filter.getPage());
 
         return response;
+    }
+
+    public void logProcessedFile(String string1, String string2) {
+        ProcessedFile file = new ProcessedFile();
+
+        file.setString1(string1);
+        file.setString2(string2);
+        file.setDate1(LocalDateTime.now());
+
+        dao.save(file);
     }
 
 }
